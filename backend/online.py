@@ -54,10 +54,10 @@ def pick_reps(list, num):
         return []
     return [list[randint(0,len(list)-1)] for x in xrange(1,num)]
 
-def eliminate_consec_dupes(list):
+def uniq_posts(list):
     retval = []
     for idx in xrange(len(list)):
-        if idx == 0 or list[idx-1] != list[idx]:
+        if idx == 0 or list[idx-1].id != list[idx].id:
             retval.append(list[idx])
     return retval
 
@@ -75,12 +75,12 @@ def cmp_recent_articles(a, b):
     return  int(rate_recent_article(b)*1000) - int(rate_recent_article(a)*1000) 
 
 def gather(user, state):
-    neighborhood = pick_reps(state.connected_clusters(user.cid), 3)
+    nearby = pick_reps(state.connected_clusters(user.cid), 3)
 
     delegates = []
 
-    for clust in neighborhood:
-        delegates = delegates + pick_reps(state.get_users_in_cluster(clust), 4)
+    for c in nearby:
+        delegates = delegates + pick_reps(state.get_users_in_cluster(c), 4)
 
     possible_articles = []
     for delg in delegates:
@@ -88,8 +88,8 @@ def gather(user, state):
         #explicitly, we need to factor them in here.  Also, we might want to give the
         #self-votes a little more power at this point, just to get articles started
         votes = state.recent_votes_by_uid(delg)
-        possible_articles += [state.get_post(vote.pid) for vote in votes]
+        possible_articles += [state.get_post(vote.pid, content=True) for vote in votes]
 
     possible_articles.sort(cmp=cmp_recent_articles)
 
-    return eliminate_consec_dupes(possible_articles)
+    return uniq_posts(possible_articles)
