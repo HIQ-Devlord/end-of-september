@@ -20,6 +20,8 @@ class State:
     def __init__(self, database='yb'):
         print >> sys.stderr, 'Initializing state . . .' 
 
+        self.active_cid = 0 #TODO get from DB        
+
         self.database = database
         random.seed()
 
@@ -81,10 +83,13 @@ class State:
                    last_used=datetime.now().isoformat())
         return ticket
     
-    def get_user(self, uid):
+    def get_user(self, uid):  # or '*, cid=...'?
         user = web.select('user', where = 'id=%s' % web.sqlquote(uid))
         if len(user) is 0: raise Exception("user with uid %d not found" % uid)
-        return user[0]
+
+        cluster_also = { 'cid': user['cid' + str(self.active_cid)] }
+        cluster_also.update(user[0])
+        return web.storage(cluster_also)
 
     def get_uid_from_name(self, name):
         user = web.select('user', where='name=%s' % web.sqlquote(name))
@@ -106,9 +111,10 @@ class State:
                    tokens = tokens,
                    safe_html='TODO')
         
-        self.vote(uid, pid)
-        self.search.add_article_contents(tokens, pid, b_s)
-        return pid
+        self.vote(uid, new_post)
+        search.add_article(self.get_post(new_post, True))        
+
+        return new_post
 
     #TODO: this laziness system works, but is kinda ugly.  We should fix it.
     def get_post(self, pid, content=False):
@@ -124,9 +130,12 @@ class State:
             'safe_html' : (lambda : web.query('select safe_html from post_content where pid=%d' % pid)[0].safe_html),
             'tokens' : (lambda : web.query('select tokens from post_content where pid=%d' % pid)[0].tokens)
             }
-        lazies.update(post[0])
+            
+            lazies.update(post[0])
         
-        return web.storage(lazies)
+            return web.storage(lazies)
+        else:
+            return post[0]
 
     def add_to_history(self, uid, pid):
         web.insert('history', uid=uid, pid=pid)
@@ -195,6 +204,7 @@ class State:
         return web.query('select * from user where cid=%d order by rand() limit %d'
                   % (cluster, count) )
         
+         #TODO remove
     def _setcluster(self, uid, new_cluster):
         uid_user = self.get_user(uid)
         if uid_user is None: return
