@@ -7,9 +7,8 @@ import state, search
 import engine
 import render_post
 import online
-from log import *
 
-log_dbg("Initializing graypages . . .")
+print "Initializing graypages . . ."
 
 render = web.template.render('templates/')
 
@@ -195,8 +194,8 @@ class compose(cookie_session, normal_style):
     i = web.input()
     uid = self.uid_from_cookie(username)
     #TODO: we need to deal with pids in posts.  And record the author.
-    pid = state.create_post(uid, i.claim, i.posttext)
-    web.seeother('/view/' + str(pid))
+    state.create_post(uid, i.claim, i.posttext)
+    web.seeother('/users/' + username + '/frontpage')
 
 class search_results(cookie_session, normal_style):
   def GET(self, username):
@@ -227,9 +226,7 @@ class vote(cookie_session):
     web.webapi.internalerror = web.debugerror
     uid = self.uid_from_cookie(user)
     state.vote(uid, pid)
-    author_uid = state.get_post(pid).uid
-    author_name = state.get_user(author_uid).name
-    print render.vote_result(state.get_post(pid), author_name, author_uid)
+    print render.vote_result(state.get_post(pid))
 
 class callout(cookie_session):
   def PUT(self, user, pid_str):
