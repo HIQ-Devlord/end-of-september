@@ -128,8 +128,9 @@ class default(cookie_session):
 
 #render the div a post sits in
 def post_div(post, uid=None, username_already=None, term=None, extras={}, expose=False):
-  if uid != None and state.voted_for(uid, post.id):
-    vote_result = render.vote_result(post.id, post.uid, state.get_user(post.uid).name)
+  pid = post.id
+  if uid != None and state.voted_for(uid, pid):
+    vote_result = render.vote_result(pid, post.uid, state.get_user(post.uid).name)
   else:
     vote_result = None
 
@@ -138,15 +139,15 @@ def post_div(post, uid=None, username_already=None, term=None, extras={}, expose
   else:
     username = username_already #save a DB call, if we can
 
-  info = {'score': post.broad_support, 'id': post.id }
+  info = {'score': post.broad_support, 'id': pid }
   info.update(extras)
   return ('''<div class="post" id="post%d">
-               <a href="javascript:dismiss(%d)" class="dismisser">
-               <img alt="dismiss" src="/static/x-icon.png" /> </a>'''
-          % (post.id, post.id)
-          + render_post.render(post, vote_result, term, username, info, expose=expose)
+    <a href="javascript:dismiss(%d)" class="dismisser">
+    <img alt="dismiss" src="/static/x-icon.png" /> </a>'''
+          % (pid, pid)
+          + render_post.show(post, vote_result, term, username, info, expose=expose)
+          + '</div>'
           )
-
 
 class frontpage(cookie_session, normal_style):
   def GET(self, username):
@@ -177,15 +178,18 @@ class article(cookie_session, normal_style):
   def GET(self, pid):
     pid = int(pid)
     post = state.get_post(pid, content=True)
-
     try:
       uid = self.uid_from_cookie(None)
+      username = state.get_user(uid).name
+      content = post_div(post, uid, username, expose=True)
+      real = uid > 10
     except CantAuth:
-      uid = None
+      username = None
+      real = False
+      content = post_div(post, expose=True)
 
-    content = post_div(post, uid, expose=True)
     self.package('', #TODO: make a special sidebar
-                 '<div class="post" id="post%d">' + content + '</div>',
+                 content,
                  real, username, js_files=['citizen.js'])
 
 class compose(cookie_session, normal_style):
@@ -219,13 +223,10 @@ class search_results(cookie_session, normal_style):
     content = ""
     for result in results:
       state.add_to_history(uid, result.post.id)
-      content += post_div(result.post, uid, username, result.term, 
-                              extras={"score": result.score})
+      content += post_div(result.post, uid, username, result.term, {"score": result.score})
       
     sidebar = render.search_sidebar(i.local)
     self.package(sidebar, content, uid < 10, username, js_files=['citizen.js'])
-
-
     
 class vote(cookie_session):
   def PUT(self, user, pid_str):
